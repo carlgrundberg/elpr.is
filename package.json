@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "next": "12.1.0",
-    "nordpool-utils": "file:../nordpool-utils",
+    "nordpool-utils": "github:carlgrundberg/nordpool-utils",
     "react": "17.0.2",
     "react-dom": "17.0.2",
     "swr": "^1.2.2"
