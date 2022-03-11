@@ -4,10 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node ./update-data.mjs && next build && next export",
     "start": "next start",
-    "lint": "next lint",
-    "update-data": "node ./update-data.mjs"
+    "lint": "next lint"
   },
   "dependencies": {
     "chart.js": "^3.7.1",
