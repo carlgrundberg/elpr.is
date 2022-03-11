@@ -1,5 +1,4 @@
-import Head from 'next/head'
-import useSWR from 'swr'
+import Head from 'next/head';
 import {
   Chart as ChartJS,
   LinearScale,
@@ -10,7 +9,7 @@ import {
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import annotationPlugin from 'chartjs-plugin-annotation';
-
+import { addHours, parseISO } from 'date-fns';
 import { Line } from 'react-chartjs-2';
 
 ChartJS.register(
@@ -22,8 +21,9 @@ ChartJS.register(
   annotationPlugin,
 );
 
+import data from '../data.json';
+
 const formatPrice = (price) => `${Math.round(price / 10)} öre/kWh`;
-const fetcher = (...args) => fetch(...args).then(res => res.json())
 
 const sum = (values) => values.reduce((acc, value) => acc + value, 0);
 const avg = (values) => sum(values) / values.length;
@@ -62,25 +62,34 @@ function getAveragePrice(prices) {
   return avg(values);
 }
 
-
-
 export default function Home() {
-  const { data } = useSWR('/api/prices', fetcher)
+  const avgToday = getAveragePrice(data.today);
+  const avgTomorrow = getAveragePrice(data.tomorrow);
+
+  const chartData = data?.today || [];
+
+  if(data?.tomorrow) {
+    chartData.push(...data.tomorrow);
+    const lastHour = data.tomorrow[data.tomorrow.length - 1];
+    chartData.push({
+      ...lastHour,
+      date: addHours(parseISO(lastHour.date), 1),
+    });
+  }
 
   const chart = {
     data: {
       datasets: [{
-        data: [...data?.today || [], ...data?.tomorrow || []].map(({ date, value }) => ({ x: date, y: value / 10 })),
+        data: chartData.map(({ date, value }) => ({ x: date, y: value / 10 })),
         borderColor: function(context) {
           const chart = context.chart;
           const {ctx, chartArea} = chart;
 
-          if (!chartArea) {
-            // This case happens on initial chart load
-            return;
+          if (chartArea) {
+            return getGradient(ctx, chartArea);
           }
-          return getGradient(ctx, chartArea);
         },
+        stepped: true,
       }]
     },
     options: {
@@ -94,7 +103,9 @@ export default function Home() {
           time: {
             unit: 'hour',
             tooltipFormat:'yyyy-MM-dd HH:mm',
-            displayFormats: {hour: 'HH:mm'}
+            displayFormats: {
+              hour: 'HH:mm'
+            }
           },
         },
         y: {
@@ -104,13 +115,41 @@ export default function Home() {
       plugins: {
         annotation: {
           annotations: {
-            annotation: {
+            priceNow: {
+              label: {
+                content: `Just nu: ${formatPrice(getPriceNow(data.today))}`,
+                enabled: true,
+                position: 'start'
+              },
               type: 'line',
               borderColor: 'black',
               borderWidth: 1,
-              borderDash: [6, 6],
               scaleID: 'x',
               value: new Date()
+            },
+            averageToday: {
+              type: 'line',
+              borderDash: [6, 6],
+              borderWidth: 1,
+              label: {
+                enabled: true,
+                content: `Snitt idag: ${formatPrice(avgToday)}`,
+                position: 'end'
+              },
+              scaleID: 'y',
+              value: avgToday / 10,
+            },
+            averageTomorrow: {
+              type: 'line',
+              borderDash: [6, 6],
+              borderWidth: 1,
+              label: {
+                enabled: true,
+                content: `Snitt imorgon: ${formatPrice(avgTomorrow)}`,
+                position: 'end'
+              },
+              scaleID: 'y',
+              value: avgTomorrow / 10,
             }
           }
         }
@@ -119,14 +158,14 @@ export default function Home() {
   };
 
   return (
-    <div>
+    <>
       <Head>
         <title>Elpr.is</title>
         <meta name="description" content="Visa nuvarande elpris" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <section className="py-8">
+      {/* <section className="py-8">
         <div className="container mx-auto flex flex-wrap">
           <div className="w-full flex flex-wrap">
             <div className="w-full md:w-1/3 p-6">
@@ -155,11 +194,11 @@ export default function Home() {
             </div>
           </div>
         </div>
-      </section>
+      </section> */}
 
-      <section className="p-8">
+      <section className="container mx-auto p-8 min-h-screen grid place-content-center">
         <Line {...chart} />
       </section>
-    </div>
-  )
+    </>
+  );
 }
