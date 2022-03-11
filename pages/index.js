@@ -64,17 +64,18 @@ function getAveragePrice(prices) {
 
 export default function Home() {
   const avgToday = getAveragePrice(data.today);
-  const avgTomorrow = getAveragePrice(data.tomorrow);
+  let avgTomorrow;
 
-  const chartData = [...data?.today || []];
+  const chartData = [...data.today || []];
 
-  if(data?.tomorrow) {
+  if(data.tomorrow?.length) {
     chartData.push(...data.tomorrow);
     const lastHour = data.tomorrow[data.tomorrow.length - 1];
     chartData.push({
       ...lastHour,
       date: addHours(parseISO(lastHour.date), 1),
     });
+    avgTomorrow = getAveragePrice(data.tomorrow);
   }
 
   const chart = {
@@ -145,7 +146,7 @@ export default function Home() {
               scaleID: 'y',
               value: avgToday / 10,
             },
-            averageTomorrow: {
+            averageTomorrow: avgTomorrow && {
               type: 'line',
               borderDash: [6, 6],
               borderWidth: 1,
@@ -171,7 +172,7 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <section className="container mx-auto p-1 min-h-screen grid place-content-center">
+      <section className="max-w-7xl min-h-screen mx-auto p-1 grid place-content-center">
         <Line {...chart} />
       </section>
     </>
