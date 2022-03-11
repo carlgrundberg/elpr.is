@@ -172,7 +172,7 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <section className="max-w-7xl min-h-screen mx-auto p-1 grid place-content-center">
+      <section className="max-w-screen-2xl min-h-screen mx-auto p-1 md:p-2 lg:p-4 xl:p-8 grid place-content-center">
         <Line {...chart} />
       </section>
     </>
