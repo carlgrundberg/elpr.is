@@ -66,7 +66,7 @@ export default function Home() {
   const avgToday = getAveragePrice(data.today);
   const avgTomorrow = getAveragePrice(data.tomorrow);
 
-  const chartData = data?.today || [];
+  const chartData = [...data?.today || []];
 
   if(data?.tomorrow) {
     chartData.push(...data.tomorrow);
@@ -80,7 +80,7 @@ export default function Home() {
   const chart = {
     data: {
       datasets: [{
-        data: chartData.map(({ date, value }) => ({ x: date, y: value / 10 })),
+        data: chartData.map(({ date, value }) => ({ x: date, y: value / 10, value })),
         borderColor: function(context) {
           const chart = context.chart;
           const {ctx, chartArea} = chart;
@@ -113,6 +113,12 @@ export default function Home() {
         }
       },
       plugins: {
+        tooltip: {
+          callbacks: {
+            label: (item) =>formatPrice(item.raw.value),
+          },
+          displayColors: false,
+        },
         annotation: {
           annotations: {
             priceNow: {
@@ -165,38 +171,7 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      {/* <section className="py-8">
-        <div className="container mx-auto flex flex-wrap">
-          <div className="w-full flex flex-wrap">
-            <div className="w-full md:w-1/3 p-6">
-              <div className="bg-gradient-to-b from-green-200 to-green-100 border-b-4 border-green-600 rounded-lg shadow-xl p-5">
-                <div className="flex-1 text-center">
-                  <h2 className="font-bold uppercase text-gray-600">Just nu</h2>
-                  <p className="font-bold text-3xl">{data ? formatPrice(getPriceNow(data.today)) : '...'}</p>
-                </div>
-              </div>
-            </div>
-            <div className="w-full md:w-1/3 p-6">
-              <div className="bg-gradient-to-b from-pink-200 to-pink-100 border-b-4 border-pink-500 rounded-lg shadow-xl p-5">
-                <div className="flex-1 text-center">
-                  <h2 className="font-bold uppercase text-gray-600">Snittpris idag</h2>
-                  <p className="font-bold text-3xl">{data ? formatPrice(getAveragePrice(data.today)) : '...'}</p>
-                </div>
-              </div>
-            </div>
-            <div className="w-full md:w-1/3 p-6">
-              <div className="bg-gradient-to-b from-yellow-200 to-yellow-100 border-b-4 border-yellow-600 rounded-lg shadow-xl p-5">
-                <div className="flex-1 text-center">
-                  <h2 className="font-bold uppercase text-gray-600">Snittpris imorgon</h2>
-                  <p className="font-bold text-3xl">{data ? data.tomorrow ? formatPrice(getAveragePrice(data.tomorrow)) : 'Ej släppt ännu' : '...'}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section> */}
-
-      <section className="container mx-auto p-8 min-h-screen grid place-content-center">
+      <section className="container mx-auto p-1 min-h-screen grid place-content-center">
         <Line {...chart} />
       </section>
     </>
