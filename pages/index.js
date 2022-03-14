@@ -63,19 +63,16 @@ function getAveragePrice(prices) {
 }
 
 export default function Home() {
-  const avgToday = getAveragePrice(data.today);
-  let avgTomorrow;
+  const avg = getAveragePrice(data);
+  let chartData = [];
 
-  const chartData = [...data.today || []];
-
-  if(data.tomorrow?.length) {
-    chartData.push(...data.tomorrow);
-    const lastHour = data.tomorrow[data.tomorrow.length - 1];
+  if(data) {
+    chartData = [...data];
+    const lastHour = data[data.length - 1];
     chartData.push({
       ...lastHour,
       date: addHours(parseISO(lastHour.date), 1),
     });
-    avgTomorrow = getAveragePrice(data.tomorrow);
   }
 
   const chart = {
@@ -124,7 +121,7 @@ export default function Home() {
           annotations: {
             priceNow: {
               label: {
-                content: `Just nu: ${formatPrice(getPriceNow(data.today))}`,
+                content: `Just nu: ${formatPrice(getPriceNow(data))}`,
                 enabled: true,
                 position: 'start'
               },
@@ -140,24 +137,12 @@ export default function Home() {
               borderWidth: 1,
               label: {
                 enabled: true,
-                content: `Snitt idag: ${formatPrice(avgToday)}`,
+                content: `Snitt: ${formatPrice(avg)}`,
                 position: 'end'
               },
               scaleID: 'y',
-              value: avgToday / 10,
+              value: avg / 10,
             },
-            averageTomorrow: avgTomorrow && {
-              type: 'line',
-              borderDash: [6, 6],
-              borderWidth: 1,
-              label: {
-                enabled: true,
-                content: `Snitt imorgon: ${formatPrice(avgTomorrow)}`,
-                position: 'end'
-              },
-              scaleID: 'y',
-              value: avgTomorrow / 10,
-            }
           }
         }
       }

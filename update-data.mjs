@@ -5,7 +5,4 @@ const today = await getTodaysPrices();
 const tomorrow = await getTomorrowsPrices();
 
 
-fs.writeFileSync('./data.json', JSON.stringify({
-  today,
-  tomorrow,
-}));
+fs.writeFileSync('./data.json', JSON.stringify([...today, ...tomorrow]));
