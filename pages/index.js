@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Head from 'next/head';
 import {
   Chart as ChartJS,
@@ -9,7 +10,8 @@ import {
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import annotationPlugin from 'chartjs-plugin-annotation';
-import { addHours, parseISO } from 'date-fns';
+import { formatRelative } from 'date-fns';
+import { sv } from 'date-fns/locale';
 import { Line } from 'react-chartjs-2';
 
 ChartJS.register(
@@ -21,12 +23,29 @@ ChartJS.register(
   annotationPlugin,
 );
 
-import data from '../data.json';
+import staticDate from '../data.json';
+import { useTime } from '../lib/useTime';
 
 const formatPrice = (price) => `${Math.round(price / 10)} öre/kWh`;
 
 const sum = (values) => values.reduce((acc, value) => acc + value, 0);
 const avg = (values) => sum(values) / values.length;
+
+const availableAreas = [
+  'SE1',
+  'SE2',
+  'SE3',
+  'SE4'
+];
+
+const areaColors = {
+  SE1: '#4e73df',
+  SE2: '#1cc88a',
+  SE3: '#36b9cc',
+  SE4: '#f6c23e',
+};
+
+const { data, timestamp } = staticDate;
 
 let width, height, gradient;
 function getGradient(ctx, chartArea) {
@@ -46,10 +65,9 @@ function getGradient(ctx, chartArea) {
   return gradient;
 }
 
-function getPriceNow(prices) {
-  const now = new Date();
+function getPriceNow(area, now) {
   let current;
-  for (const item of prices) {
+  for (const item of data[area]) {
     if (!current || new Date(item.date) < now) {
       current = item;
     }
@@ -57,38 +75,53 @@ function getPriceNow(prices) {
   return current?.value;
 }
 
-function getAveragePrice(prices) {
-  const values = prices.map((item) => item.value);
+function getAveragePrice(areas) {
+  const values = areas.flatMap(area => data[area].map((item) => item.value));
   return avg(values);
 }
 
 export default function Home() {
-  const avg = getAveragePrice(data);
-  let chartData = [];
+  const [areas, setAreas] = useState(['SE4']);
+  const [showNow, setShowNow] = useState(true);
+  const [showAverage, setShowAverage] = useState(true);
+  const now = useTime(1000 * 60);
+  const avg = getAveragePrice(areas);
+  // let chartData = [];
 
-  if(data) {
-    chartData = [...data];
-    const lastHour = data[data.length - 1];
-    chartData.push({
-      ...lastHour,
-      date: addHours(parseISO(lastHour.date), 1),
-    });
-  }
+  const toggleAreas = (area) => {
+    const newAreas = [...areas];
+    const index = newAreas.indexOf(area);
+    if (index === -1) {
+      newAreas.push(area);
+    } else {
+      newAreas.splice(index, 1);
+    }
+    setAreas(newAreas);
+  };
+
+  // if(data) {
+  //   chartData = [...data];
+  //   const lastHour = data[data.length - 1];
+  //   chartData.push({
+  //     ...lastHour,
+  //     date: addHours(parseISO(lastHour.date), 1),
+  //   });
+  // }
 
   const chart = {
     data: {
-      datasets: [{
-        data: chartData.map(({ date, value }) => ({ x: date, y: value / 10, value })),
-        borderColor: function(context) {
+      datasets: areas.map(area => ({
+        data: data[area]?.map(({ date, value }) => ({ x: date, y: value / 10, value })),
+        borderColor: areas.length === 1 ? function(context) {
           const chart = context.chart;
           const {ctx, chartArea} = chart;
 
           if (chartArea) {
             return getGradient(ctx, chartArea);
           }
-        },
+        }: areaColors[area],
         stepped: true,
-      }]
+      })),
     },
     options: {
       interaction: {
@@ -120,8 +153,9 @@ export default function Home() {
         annotation: {
           annotations: {
             priceNow: {
+              display: showNow,
               label: {
-                content: `Just nu: ${formatPrice(getPriceNow(data))}`,
+                content: areas.map(area => `${area}: ${formatPrice(getPriceNow(area, now))}`),
                 enabled: true,
                 position: 'start'
               },
@@ -129,9 +163,10 @@ export default function Home() {
               borderColor: 'black',
               borderWidth: 1,
               scaleID: 'x',
-              value: new Date()
+              value: new Date(now)
             },
             averageToday: {
+              display: showAverage,
               type: 'line',
               borderDash: [6, 6],
               borderWidth: 1,
@@ -158,7 +193,24 @@ export default function Home() {
       </Head>
 
       <section className="max-w-screen-2xl min-h-screen mx-auto p-1 md:p-2 lg:p-4 xl:p-8 grid place-content-center">
+        <div className="flex gap-2 my-2 place-content-center">
+          {availableAreas.map((area) => (
+            <label key={area} className="inline-flex items-center">
+              <input type="checkbox" className="rounded" checked={areas.includes(area)} onChange={() => toggleAreas(area)} />
+              <span className="ml-2">{area}</span>
+            </label>
+          ))}
+          <label className="inline-flex items-center">
+            <input type="checkbox" className="rounded" checked={showNow} onChange={() => setShowNow(!showNow)} />
+            <span className="ml-2">Just nu</span>
+          </label>
+          <label className="inline-flex items-center">
+            <input type="checkbox" className="rounded" checked={showAverage} onChange={() => setShowAverage(!showAverage)} />
+            <span className="ml-2">Snitt</span>
+          </label>
+        </div>
         <Line {...chart} />
+        <div className="text-center text-sm">Senast uppdaterad {formatRelative(timestamp, now, { locale: sv })}</div>
       </section>
     </>
   );
