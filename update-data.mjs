@@ -11,7 +11,7 @@ for(const area of areas) {
   data[area] = [...today, ...tomorrow, ];
 
   if(data[area]) {
-    const lastHour = data[data.length - 1];
+    const lastHour = data[area][data[area].length - 1];
     data[area].push({
       ...lastHour,
       date: addHours(parseISO(lastHour.date), 1),
