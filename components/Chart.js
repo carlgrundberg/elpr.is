@@ -12,6 +12,7 @@ import annotationPlugin from 'chartjs-plugin-annotation';
 import { formatRelative } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import { Line } from 'react-chartjs-2';
+import { useLocalStorageState } from 'ahooks';
 
 ChartJS.register(
   TimeScale,
@@ -80,9 +81,9 @@ function getAveragePrice(areas) {
 }
 
 export default function Chart() {
-  const [areas, setAreas] = useState(['SE4']);
-  const [showNow, setShowNow] = useState(true);
-  const [showAverage, setShowAverage] = useState(true);
+  const [areas, setAreas] = useLocalStorageState('areas', { defaultValue: ['SE4'] });
+  const [showNow, setShowNow] = useLocalStorageState('showNow', { defaultValue: true });
+  const [showAverage, setShowAverage] = useLocalStorageState('showAverage', { defaultValue: true });
   const now = useTime(1000 * 60);
   const avg = getAveragePrice(areas);
 
@@ -113,6 +114,7 @@ export default function Chart() {
       })),
     },
     options: {
+      maintainAspectRatio: false,
       interaction: {
         mode: 'index',
         intersect: false,
@@ -191,7 +193,9 @@ export default function Chart() {
           <span className="ml-2">Snitt</span>
         </label>
       </div>
-      <Line {...chart} />
+      <div class="w-screen" style={{ height: '80vh' }}>
+        <Line {...chart} />
+      </div>
       <div className="text-center text-sm">Senast uppdaterad {formatRelative(timestamp, now, { locale: sv })}</div>
     </section>
   );
