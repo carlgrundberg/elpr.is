@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   Chart as ChartJS,
   LinearScale,
@@ -193,7 +192,7 @@ export default function Chart() {
           <span className="ml-2">Snitt</span>
         </label>
       </div>
-      <div class="w-screen" style={{ height: '80vh' }}>
+      <div style={{ height: '80vh' }}>
         <Line {...chart} />
       </div>
       <div className="text-center text-sm">Senast uppdaterad {formatRelative(timestamp, now, { locale: sv })}</div>
