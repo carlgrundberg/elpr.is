@@ -175,8 +175,8 @@ export default function Chart() {
   };
 
   return (
-    <section className="max-w-screen-2xl min-h-screen mx-auto p-1 md:p-2 lg:p-4 xl:p-8 grid place-content-center">
-      <div className="flex gap-2 my-2 place-content-center">
+    <section className="h-screen mx-auto p-2 md:p-4 lg:p-8 grid place-content-center">
+      <div className="flex flex-wrap gap-2 place-content-center">
         {availableAreas.map((area) => (
           <label key={area} className="inline-flex items-center">
             <input type="checkbox" className="rounded" checked={areas.includes(area)} onChange={() => toggleAreas(area)} />
@@ -192,7 +192,7 @@ export default function Chart() {
           <span className="ml-2">Snitt</span>
         </label>
       </div>
-      <div className="w-screen" style={{ height: '80vh' }}>
+      <div className="w-screen" style={{ height: '80vh', maxHeight: 800, maxWidth: 1200 }}>
         <Line {...chart} />
       </div>
       <div className="text-center text-sm">Senast uppdaterad {formatRelative(timestamp, now, { locale: sv })}</div>
