@@ -175,7 +175,7 @@ export default function Chart() {
   };
 
   return (
-    <section className="h-screen mx-auto p-2 md:p-4 lg:p-8 grid place-content-center">
+    <section>
       <div className="flex flex-wrap gap-2 place-content-center">
         {availableAreas.map((area) => (
           <label key={area} className="inline-flex items-center">
@@ -192,7 +192,7 @@ export default function Chart() {
           <span className="ml-2">Snitt</span>
         </label>
       </div>
-      <div className="w-screen" style={{ height: '80vh', maxHeight: 800, maxWidth: 1200 }}>
+      <div className="w-screen p-1" style={{ height: '80vh', maxHeight: 800, maxWidth: 1200 }}>
         <Line {...chart} />
       </div>
       <div className="text-center text-sm">Senast uppdaterad {formatRelative(timestamp, now, { locale: sv })}</div>
