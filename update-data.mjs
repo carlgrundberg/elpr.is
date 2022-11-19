@@ -1,36 +1,55 @@
 import fs from 'fs';
-import { addHours, parseISO } from 'date-fns';
+import { addHours, addDays, parseISO } from 'date-fns';
 import { getTodaysPrices, getTomorrowsPrices } from "nordpool-utils";
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
-const areas = ['SE1', 'SE2', 'SE3', 'SE4'];
-const data = {};
+const data = {
+  areas: {},
+  timestamp: new Date().getTime(),
+};
 
-for(const area of areas) {
+const areas = await prisma.area.findMany({});
+
+for(const { name: area, id: area_id } of areas) {
   const today = await getTodaysPrices({ area });
   const tomorrow = await getTomorrowsPrices({ area });
-  data[area] = [...today, ...tomorrow, ];
 
-  if(data[area]) {
-    const lastHour = data[area][data[area].length - 1];
-    data[area].push({
-      ...lastHour,
-      date: addHours(parseISO(lastHour.date), 1),
-    });
-  }
+  const areaData = {
+    prices: [
+      ...today,
+      ...tomorrow,
+      {
+        date: addHours(parseISO(tomorrow[tomorrow.length - 1].date), 1),
+        value: tomorrow[tomorrow.length - 1].value,
+      },
+    ].map(({ date, value }) => ({ date, value })),
+  };
 
   await prisma.price.createMany({
     data: tomorrow.map((hour) => ({
-      area_id: areas.indexOf(hour.area) + 1,
+      area_id,
       date: hour.date,
       value: hour.value,
     })),
     skipDuplicates: true,
   });
+
+
+  const prices = await prisma.price.findMany({
+    where: {
+      area_id,
+      date: {
+        gte: addDays(new Date(), -30),
+      },
+    },
+    orderBy: {
+      date: 'asc',
+    },
+  });
+
+  areaData.avg = prices.reduce((acc, { value }) => acc + value, 0) / prices.length;
+  data.areas[area] = areaData;
 }
 
-fs.writeFileSync('./data.json', JSON.stringify({
-  data,
-  timestamp: new Date().getTime(),
-}));
+fs.writeFileSync('./data.json', JSON.stringify(data));

@@ -8,7 +8,7 @@ import {
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import annotationPlugin from 'chartjs-plugin-annotation';
-import { formatRelative } from 'date-fns';
+import { format, formatRelative } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import { Line } from 'react-chartjs-2';
 import { useLocalStorageState } from 'ahooks';
@@ -22,20 +22,13 @@ ChartJS.register(
   annotationPlugin,
 );
 
-import staticDate from '../data.json';
+import staticData from '../data.json';
 import { useTime } from '../lib/useTime';
 
 const formatPrice = (price) => `${Math.round(price / 10)} öre/kWh`;
 
 const sum = (values) => values.reduce((acc, value) => acc + value, 0);
 const avg = (values) => sum(values) / values.length;
-
-const availableAreas = [
-  'SE1',
-  'SE2',
-  'SE3',
-  'SE4'
-];
 
 const areaColors = {
   SE1: '#4e73df',
@@ -44,7 +37,7 @@ const areaColors = {
   SE4: '#f6c23e',
 };
 
-const { data, timestamp } = staticDate;
+const { areas, timestamp } = staticData;
 
 let width, height, gradient;
 function getGradient(ctx, chartArea) {
@@ -66,7 +59,7 @@ function getGradient(ctx, chartArea) {
 
 function getPriceNow(area, now) {
   let current;
-  for (const item of data[area]) {
+  for (const item of areas[area].prices) {
     if (!current || new Date(item.date) < now) {
       current = item;
     }
@@ -74,34 +67,36 @@ function getPriceNow(area, now) {
   return current?.value;
 }
 
-function getAveragePrice(areas) {
-  const values = areas.flatMap(area => data[area].map((item) => item.value));
+function getAveragePrice(selectedAreas) {
+  const values = selectedAreas.flatMap(area => areas[area].prices.map((item) => item.value));
   return avg(values);
 }
 
 export default function Chart() {
-  const [areas, setAreas] = useLocalStorageState('areas', { defaultValue: ['SE4'] });
+  const [selectedAreas, setSelectedAreas] = useLocalStorageState('selectedAreas', { defaultValue: ['SE4'] });
   const [showNow, setShowNow] = useLocalStorageState('showNow', { defaultValue: true });
-  const [showAverage, setShowAverage] = useLocalStorageState('showAverage', { defaultValue: true });
+  const [showAverage, setShowAverage] = useLocalStorageState('showAverage', { defaultValue: false });
+  const [showAverage30d, setShowAverage30d] = useLocalStorageState('showAverage30d', { defaultValue: true });
   const now = useTime(1000 * 60);
-  const avg = getAveragePrice(areas);
+  const avg = getAveragePrice(selectedAreas);
+  const avg30d = selectedAreas.reduce((acc, area) => acc + areas[area].avg, 0) / selectedAreas.length;
 
   const toggleAreas = (area) => {
-    const newAreas = [...areas];
+    const newAreas = [...selectedAreas];
     const index = newAreas.indexOf(area);
     if (index === -1) {
       newAreas.push(area);
     } else {
       newAreas.splice(index, 1);
     }
-    setAreas(newAreas);
+    setSelectedAreas(newAreas);
   };
 
   const chart = {
     data: {
-      datasets: areas.map(area => ({
-        data: data[area]?.map(({ date, value }) => ({ x: date, y: value / 10, value })),
-        borderColor: areas.length === 1 ? function(context) {
+      datasets: selectedAreas.map(area => ({
+        data: areas[area]?.prices.map(({ date, value }) => ({ x: date, y: value / 10, value })),
+        borderColor: selectedAreas.length === 1 ? function(context) {
           const chart = context.chart;
           const {ctx, chartArea} = chart;
 
@@ -128,9 +123,18 @@ export default function Chart() {
               hour: 'HH:mm'
             }
           },
+          ticks: {
+            color: 'rgb(243,244,246)',
+            callback: function(val, index, data) {
+              return val === '00:00' ? format(data[index].value, 'dd MMM') : val;
+            },
+          },
         },
         y: {
-          beginAtZero: true,
+          ticks: {
+            color: 'rgb(243,244,246)',
+          },
+          // beginAtZero: true,
         }
       },
       plugins: {
@@ -145,12 +149,12 @@ export default function Chart() {
             priceNow: {
               display: showNow,
               label: {
-                content: areas.map(area => `${area}: ${formatPrice(getPriceNow(area, now))}`),
+                content: selectedAreas.map(area => `${area}: ${formatPrice(getPriceNow(area, now))}`),
                 enabled: true,
                 position: 'start'
               },
               type: 'line',
-              borderColor: 'black',
+              borderColor: 'rgb(243,244,246)',
               borderWidth: 1,
               scaleID: 'x',
               value: new Date(now)
@@ -159,6 +163,7 @@ export default function Chart() {
               display: showAverage,
               type: 'line',
               borderDash: [6, 6],
+              borderColor: 'rgb(243,244,246)',
               borderWidth: 1,
               label: {
                 enabled: true,
@@ -167,6 +172,20 @@ export default function Chart() {
               },
               scaleID: 'y',
               value: avg / 10,
+            },
+            average30d: {
+              display: showAverage30d,
+              type: 'line',
+              borderDash: [6, 6],
+              borderColor: 'rgb(243,244,246)',
+              borderWidth: 1,
+              label: {
+                enabled: true,
+                content: `Snitt 30d: ${formatPrice(avg30d)}`,
+                position: 'end'
+              },
+              scaleID: 'y',
+              value: avg30d / 10,
             },
           }
         }
@@ -177,25 +196,34 @@ export default function Chart() {
   return (
     <section>
       <div className="flex flex-wrap gap-2 place-content-center">
-        {availableAreas.map((area) => (
+        {Object.keys(areas).map((area) => (
           <label key={area} className="inline-flex items-center">
-            <input type="checkbox" className="rounded" checked={areas.includes(area)} onChange={() => toggleAreas(area)} />
+            <input type="checkbox" className="rounded" checked={selectedAreas.includes(area)} onChange={() => toggleAreas(area)} />
             <span className="ml-2">{area}</span>
           </label>
         ))}
+      </div>
+      <div className="flex flex-wrap gap-2 place-content-center">
         <label className="inline-flex items-center">
           <input type="checkbox" className="rounded" checked={showNow} onChange={() => setShowNow(!showNow)} />
           <span className="ml-2">Just nu</span>
         </label>
         <label className="inline-flex items-center">
           <input type="checkbox" className="rounded" checked={showAverage} onChange={() => setShowAverage(!showAverage)} />
-          <span className="ml-2">Snitt</span>
+          <span className="ml-2">Snitt graf</span>
+        </label>
+        <label className="inline-flex items-center">
+          <input type="checkbox" className="rounded" checked={showAverage30d} onChange={() => setShowAverage30d(!showAverage30d)} />
+          <span className="ml-2">Snitt 30 dagar</span>
         </label>
       </div>
       <div className="w-screen p-1" style={{ height: '80vh', maxHeight: 800, maxWidth: 1200 }}>
         <Line {...chart} />
       </div>
       <div className="text-center text-sm">Senast uppdaterad {formatRelative(timestamp, now, { locale: sv })}</div>
+      <div className="text-center text-sm">
+        <a className="text-blue-600" href="https://github.com/carlgrundberg/elpr.is" target="_blank" rel="noreferrer">Källkod och rapportera problem</a>
+      </div>
     </section>
   );
 }
