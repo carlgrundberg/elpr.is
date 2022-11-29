@@ -217,7 +217,7 @@ export default function Chart() {
           <span className="ml-2">Snitt 30 dagar</span>
         </label>
       </div>
-      <div className="w-screen p-1" style={{ height: '80vh', maxHeight: 800, maxWidth: 1200 }}>
+      <div className="w-screen p-1" style={{ height: '70vh', maxHeight: 800, maxWidth: 1200 }}>
         <Line {...chart} />
       </div>
       <div className="text-center text-sm">Senast uppdaterad {formatRelative(timestamp, now, { locale: sv })}</div>

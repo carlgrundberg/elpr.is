@@ -14,14 +14,14 @@ const areas = await prisma.area.findMany({});
 for(const { name: area, id: area_id } of areas) {
   const today = await getTodaysPrices({ area });
   const tomorrow = await getTomorrowsPrices({ area });
+  const prices = [...today, ...tomorrow];
 
   const areaData = {
     prices: [
-      ...today,
-      ...tomorrow,
+      ...prices,
       {
-        date: addHours(parseISO(tomorrow[tomorrow.length - 1].date), 1),
-        value: tomorrow[tomorrow.length - 1].value,
+        date: addHours(parseISO(prices[prices.length - 1].date), 1),
+        value: prices[prices.length - 1].value,
       },
     ].map(({ date, value }) => ({ date, value })),
   };
@@ -36,7 +36,7 @@ for(const { name: area, id: area_id } of areas) {
   });
 
 
-  const prices = await prisma.price.findMany({
+  const priceHistory = await prisma.price.findMany({
     where: {
       area_id,
       date: {
@@ -48,7 +48,7 @@ for(const { name: area, id: area_id } of areas) {
     },
   });
 
-  areaData.avg = prices.reduce((acc, { value }) => acc + value, 0) / prices.length;
+  areaData.avg = priceHistory.reduce((acc, { value }) => acc + value, 0) / priceHistory.length;
   data.areas[area] = areaData;
 }
 
