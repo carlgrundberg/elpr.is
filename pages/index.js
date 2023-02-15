@@ -1,6 +1,8 @@
 import Head from 'next/head';
-import Chart from '../components/Chart';
 import { format } from 'date-fns';
+import dynamic from 'next/dynamic';
+
+const Chart = dynamic(() =>import("../components/Chart"), {ssr: false});
 
 export default function Home() {
   return (

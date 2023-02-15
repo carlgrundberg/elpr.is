@@ -22,13 +22,15 @@ ChartJS.register(
   annotationPlugin,
 );
 
-import staticData from '../data.json';
+// import staticData from '../data.json';
 import { useTime } from '../lib/useTime';
+import { useQuery } from '@tanstack/react-query';
+import { getPrices } from '../lib/api';
 
-const formatPrice = (price) => `${Math.round(price / 10)} öre/kWh`;
+const formatPrice = (price) => price != null ? `${Math.round(price / 10)} öre/kWh` : 'Unknown';
 
-const sum = (values) => values.reduce((acc, value) => acc + value, 0);
-const avg = (values) => sum(values) / values.length;
+const sum = (values) => values.reduce((acc, value) => acc + (value || 0), 0);
+const avg = (values) => sum(values) / (values?.length || 1);
 
 const areaColors = {
   SE1: '#4e73df',
@@ -37,7 +39,16 @@ const areaColors = {
   SE4: '#f6c23e',
 };
 
-const { areas, timestamp } = staticData;
+const availableAreas = [
+  'SE1',
+  'SE2',
+  'SE3',
+  'SE4'
+];
+
+const timestamp = new Date().getTime();
+
+// const { areas, timestamp } = staticData;
 
 let width, height, gradient;
 function getGradient(ctx, chartArea) {
@@ -57,18 +68,20 @@ function getGradient(ctx, chartArea) {
   return gradient;
 }
 
-function getPriceNow(area, now) {
+function getPriceNow(area, now, areaPrices) {
   let current;
-  for (const item of areas[area].prices) {
-    if (!current || new Date(item.date) < now) {
-      current = item;
+  if(areaPrices?.[area]) {
+    for (const item of areaPrices[area]) {
+      if (!current || new Date(item.date) < now) {
+        current = item;
+      }
     }
   }
   return current?.value;
 }
 
-function getAveragePrice(selectedAreas) {
-  const values = selectedAreas.flatMap(area => areas[area].prices.map((item) => item.value));
+function getAveragePrice(selectedAreas, areaPrices) {
+  const values = selectedAreas.flatMap(area => areaPrices?.[area]?.map((item) => item.value));
   return avg(values);
 }
 
@@ -78,8 +91,22 @@ export default function Chart() {
   const [showAverage, setShowAverage] = useLocalStorageState('showAverage', { defaultValue: false });
   const [showAverage30d, setShowAverage30d] = useLocalStorageState('showAverage30d', { defaultValue: true });
   const now = useTime(1000 * 60);
-  const avg = getAveragePrice(selectedAreas);
-  const avg30d = selectedAreas.reduce((acc, area) => acc + areas[area].avg, 0) / selectedAreas.length;
+
+  const query = useQuery({ queryKey: ['prices', selectedAreas], queryFn: () => selectedAreas.map(area => getPrices(area, now))});
+
+
+  console.log(query.data);
+
+  const areaPrices = query.data?.reduce((acc, item) => {
+    acc[item.area] = acc[item.area] || [];
+    acc[item.area].push(item);
+    return acc;
+  }, {});
+
+
+  const avg = getAveragePrice(selectedAreas, areaPrices);
+  // const avg30d = selectedAreas.reduce((acc, area) => acc + areas[area].avg, 0) / selectedAreas.length;
+
 
   const toggleAreas = (area) => {
     const newAreas = [...selectedAreas];
@@ -95,7 +122,7 @@ export default function Chart() {
   const chart = {
     data: {
       datasets: selectedAreas.map(area => ({
-        data: areas[area]?.prices.map(({ date, value }) => ({ x: date, y: value / 10, value })),
+        data: areaPrices?.[area]?.map(({ date, sek }) => ({ x: date, y: sek, value: sek })),
         borderColor: selectedAreas.length === 1 ? function(context) {
           const chart = context.chart;
           const {ctx, chartArea} = chart;
@@ -149,7 +176,7 @@ export default function Chart() {
             priceNow: {
               display: showNow,
               label: {
-                content: selectedAreas.map(area => `${area}: ${formatPrice(getPriceNow(area, now))}`),
+                content: selectedAreas.map(area => `${area}: ${formatPrice(getPriceNow(area, now, areaPrices))}`),
                 enabled: true,
                 position: 'start'
               },
@@ -160,7 +187,7 @@ export default function Chart() {
               value: new Date(now)
             },
             averageToday: {
-              display: showAverage,
+              display: showAverage && avg,
               type: 'line',
               borderDash: [6, 6],
               borderColor: 'rgb(243,244,246)',
@@ -173,20 +200,20 @@ export default function Chart() {
               scaleID: 'y',
               value: avg / 10,
             },
-            average30d: {
-              display: showAverage30d,
-              type: 'line',
-              borderDash: [6, 6],
-              borderColor: 'rgb(243,244,246)',
-              borderWidth: 1,
-              label: {
-                enabled: true,
-                content: `Snitt 30d: ${formatPrice(avg30d)}`,
-                position: 'end'
-              },
-              scaleID: 'y',
-              value: avg30d / 10,
-            },
+            // average30d: {
+            //   display: showAverage30d,
+            //   type: 'line',
+            //   borderDash: [6, 6],
+            //   borderColor: 'rgb(243,244,246)',
+            //   borderWidth: 1,
+            //   label: {
+            //     enabled: true,
+            //     content: `Snitt 30d: ${formatPrice(avg30d)}`,
+            //     position: 'end'
+            //   },
+            //   scaleID: 'y',
+            //   value: avg30d / 10,
+            // },
           }
         }
       }
@@ -196,7 +223,7 @@ export default function Chart() {
   return (
     <section>
       <div className="flex flex-wrap gap-2 place-content-center">
-        {Object.keys(areas).map((area) => (
+        {availableAreas.map((area) => (
           <label key={area} className="inline-flex items-center">
             <input type="checkbox" className="rounded" checked={selectedAreas.includes(area)} onChange={() => toggleAreas(area)} />
             <span className="ml-2">{area}</span>
