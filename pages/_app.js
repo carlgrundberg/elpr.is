@@ -1,16 +1,6 @@
-import { QueryClient } from '@tanstack/react-query';
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import Script from 'next/script';
-import persister from '../lib/persister';
 import '../styles/globals.css';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      cacheTime: Infinity,
-    },
-  },
-});
 
 function MyApp({ Component, pageProps }) {
   return <>
@@ -26,9 +16,7 @@ tags.async=!0,tags.src="https://calle.containers.piwik.pro/"+id+".js"+qPString,s
 })(window, document, 'dataLayer', 'a087a542-b0f4-467c-b372-d102bdb907f8');`}
       </Script>
     )}
-    <PersistQueryClientProvider client={queryClient} persistOptions={{ persister }}>
-      <Component {...pageProps} />
-    </PersistQueryClientProvider>
+    <Component {...pageProps} />
   </>;
 }
 export default MyApp;

@@ -8,10 +8,11 @@ import {
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import annotationPlugin from 'chartjs-plugin-annotation';
-import { format, formatRelative } from 'date-fns';
+import { addDays, format, formatRelative } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import { Line } from 'react-chartjs-2';
 import { useLocalStorageState } from 'ahooks';
+import persister from '../lib/persister';
 
 ChartJS.register(
   TimeScale,
@@ -24,10 +25,11 @@ ChartJS.register(
 
 // import staticData from '../data.json';
 import { useTime } from '../lib/useTime';
-import { useQuery } from '@tanstack/react-query';
+import { QueryClient, useQueries } from '@tanstack/react-query';
 import { getPrices } from '../lib/api';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 
-const formatPrice = (price) => price != null ? `${Math.round(price / 10)} öre/kWh` : 'Unknown';
+const formatPrice = (price) => price != null ? `${Math.round(price)} öre/kWh` : 'Unknown';
 
 const sum = (values) => values.reduce((acc, value) => acc + (value || 0), 0);
 const avg = (values) => sum(values) / (values?.length || 1);
@@ -77,32 +79,33 @@ function getPriceNow(area, now, areaPrices) {
       }
     }
   }
-  return current?.value;
+  return current?.sek;
 }
 
 function getAveragePrice(selectedAreas, areaPrices) {
-  const values = selectedAreas.flatMap(area => areaPrices?.[area]?.map((item) => item.value));
+  const values = selectedAreas.flatMap(area => areaPrices?.[area]?.map((item) => item.sek));
   return avg(values);
 }
 
-export default function Chart() {
+function Chart() {
   const [selectedAreas, setSelectedAreas] = useLocalStorageState('selectedAreas', { defaultValue: ['SE4'] });
   const [showNow, setShowNow] = useLocalStorageState('showNow', { defaultValue: true });
   const [showAverage, setShowAverage] = useLocalStorageState('showAverage', { defaultValue: false });
   const [showAverage30d, setShowAverage30d] = useLocalStorageState('showAverage30d', { defaultValue: true });
   const now = useTime(1000 * 60);
+  const dates = [now, addDays(now, 1)];
 
-  const query = useQuery({ queryKey: ['prices', selectedAreas], queryFn: () => selectedAreas.map(area => getPrices(area, now))});
+  const results = useQueries({ queries: selectedAreas.flatMap(area => dates.map(date => ({ queryKey: [area, format(date, 'yyyy-MM-dd')], queryFn: () => getPrices(area, date) }) )) });
 
-
-  console.log(query.data);
-
-  const areaPrices = query.data?.reduce((acc, item) => {
-    acc[item.area] = acc[item.area] || [];
-    acc[item.area].push(item);
+  const areaPrices = results.reduce((acc, r) => {
+    if(r.data) {
+      if(!acc[r.data.area]) {
+        acc[r.data.area] = [];
+      }
+      acc[r.data.area].push(...r.data.prices);
+    }
     return acc;
   }, {});
-
 
   const avg = getAveragePrice(selectedAreas, areaPrices);
   // const avg30d = selectedAreas.reduce((acc, area) => acc + areas[area].avg, 0) / selectedAreas.length;
@@ -198,7 +201,7 @@ export default function Chart() {
                 position: 'end'
               },
               scaleID: 'y',
-              value: avg / 10,
+              value: avg,
             },
             // average30d: {
             //   display: showAverage30d,
@@ -253,4 +256,18 @@ export default function Chart() {
       </div>
     </section>
   );
+}
+
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      cacheTime: Infinity,
+      staleTime: Infinity,
+    },
+  },
+});
+
+export default function ChartWrapper() {
+  return <PersistQueryClientProvider client={queryClient} persistOptions={{ persister }}><Chart /></PersistQueryClientProvider>;
 }
