@@ -28,6 +28,7 @@ import { useTime } from '../lib/useTime';
 import { QueryClient, useQueries } from '@tanstack/react-query';
 import { getPrices } from '../lib/api';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import Loading from './Loading';
 
 const formatPrice = (price) => price != null ? `${Math.round(price)} öre/kWh` : 'Unknown';
 
@@ -82,22 +83,8 @@ function getPriceNow(area, now, areaPrices) {
   return current?.sek;
 }
 
-function getAveragePrice(selectedAreas, areaPrices) {
-  const values = selectedAreas.flatMap(area => areaPrices?.[area]?.map((item) => item.sek));
-  return avg(values);
-}
-
-function Chart() {
-  const [selectedAreas, setSelectedAreas] = useLocalStorageState('selectedAreas', { defaultValue: ['SE4'] });
-  const [showNow, setShowNow] = useLocalStorageState('showNow', { defaultValue: true });
-  const [showAverage, setShowAverage] = useLocalStorageState('showAverage', { defaultValue: false });
-  const [showAverage30d, setShowAverage30d] = useLocalStorageState('showAverage30d', { defaultValue: true });
-  const now = useTime(1000 * 60);
-  const dates = [now, addDays(now, 1)];
-
-  const results = useQueries({ queries: selectedAreas.flatMap(area => dates.map(date => ({ queryKey: [area, format(date, 'yyyy-MM-dd')], queryFn: () => getPrices(area, date) }) )) });
-
-  const areaPrices = results.reduce((acc, r) => {
+function getAreaPrices(results) {
+  return results.reduce((acc, r) => {
     if(r.data) {
       if(!acc[r.data.area]) {
         acc[r.data.area] = [];
@@ -106,10 +93,38 @@ function Chart() {
     }
     return acc;
   }, {});
+}
 
-  const avg = getAveragePrice(selectedAreas, areaPrices);
-  // const avg30d = selectedAreas.reduce((acc, area) => acc + areas[area].avg, 0) / selectedAreas.length;
+function getAveragePrice(selectedAreas, areaPrices, count) {
+  const values = selectedAreas.flatMap(area => areaPrices?.[area]?.slice(-count).map((item) => item.sek));
+  return avg(values);
+}
 
+function getDates(now) {
+  const dates = [];
+  for (let i = -28; i < 2; i++) {
+    dates.push(addDays(now, i));
+  }  
+  return dates;
+}
+
+function Chart() {
+  const [selectedAreas, setSelectedAreas] = useLocalStorageState('selectedAreas', { defaultValue: ['SE4'] });
+  const [showNow, setShowNow] = useLocalStorageState('showNow', { defaultValue: true });
+  const [showAverage, setShowAverage] = useLocalStorageState('showAverage', { defaultValue: false });
+  const [showAverage30d, setShowAverage30d] = useLocalStorageState('showAverage30d', { defaultValue: true });
+  const now = useTime(1000 * 60);
+
+  const results = useQueries({ 
+    queries: selectedAreas.flatMap(area => getDates(now).map(date => ({ queryKey: [area, format(date, 'yyyy-MM-dd')], queryFn: () => getPrices(area, date) }) )) 
+  });
+
+  const areaPrices = getAreaPrices(results);
+
+  const avg = getAveragePrice(selectedAreas, areaPrices, 48);
+  const avg30d = getAveragePrice(selectedAreas, areaPrices);
+
+  const loading = results.some(r => r.isLoading);
 
   const toggleAreas = (area) => {
     const newAreas = [...selectedAreas];
@@ -125,7 +140,7 @@ function Chart() {
   const chart = {
     data: {
       datasets: selectedAreas.map(area => ({
-        data: areaPrices?.[area]?.map(({ date, sek }) => ({ x: date, y: sek, value: sek })),
+        data: areaPrices?.[area]?.slice(-48).map(({ date, sek }) => ({ x: date, y: sek, value: sek })),
         borderColor: selectedAreas.length === 1 ? function(context) {
           const chart = context.chart;
           const {ctx, chartArea} = chart;
@@ -203,20 +218,20 @@ function Chart() {
               scaleID: 'y',
               value: avg,
             },
-            // average30d: {
-            //   display: showAverage30d,
-            //   type: 'line',
-            //   borderDash: [6, 6],
-            //   borderColor: 'rgb(243,244,246)',
-            //   borderWidth: 1,
-            //   label: {
-            //     enabled: true,
-            //     content: `Snitt 30d: ${formatPrice(avg30d)}`,
-            //     position: 'end'
-            //   },
-            //   scaleID: 'y',
-            //   value: avg30d / 10,
-            // },
+            average30d: {
+              display: showAverage30d,
+              type: 'line',
+              borderDash: [6, 6],
+              borderColor: 'rgb(243,244,246)',
+              borderWidth: 1,
+              label: {
+                enabled: true,
+                content: `Snitt 30d: ${formatPrice(avg30d)}`,
+                position: 'end'
+              },
+              scaleID: 'y',
+              value: avg30d,
+            },
           }
         }
       }
@@ -254,6 +269,7 @@ function Chart() {
       <div className="text-center text-sm">
         <a className="text-blue-600" href="https://github.com/carlgrundberg/elpr.is" target="_blank" rel="noreferrer">Källkod och rapportera problem</a>
       </div>
+      {loading && <Loading />}
     </section>
   );
 }
