@@ -8,8 +8,7 @@ import {
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import annotationPlugin from 'chartjs-plugin-annotation';
-import { addDays, format, formatRelative } from 'date-fns';
-import { sv } from 'date-fns/locale';
+import { addDays, format } from 'date-fns';
 import { Line } from 'react-chartjs-2';
 import { useLocalStorageState } from 'ahooks';
 import persister from '../lib/persister';
@@ -23,7 +22,6 @@ ChartJS.register(
   annotationPlugin,
 );
 
-// import staticData from '../data.json';
 import { useTime } from '../lib/useTime';
 import { QueryClient, useQueries } from '@tanstack/react-query';
 import { getPrices } from '../lib/api';
@@ -48,10 +46,6 @@ const availableAreas = [
   'SE3',
   'SE4'
 ];
-
-const timestamp = new Date().getTime();
-
-// const { areas, timestamp } = staticData;
 
 let width, height, gradient;
 function getGradient(ctx, chartArea) {
@@ -265,7 +259,9 @@ function Chart() {
       <div className="w-screen p-1" style={{ height: '70vh', maxHeight: 800, maxWidth: 1200 }}>
         <Line {...chart} />
       </div>
-      <div className="text-center text-sm">Senast uppdaterad {formatRelative(timestamp, now, { locale: sv })}</div>
+      <div className="text-center text-sm mb-2">
+        Elpriser tillhandahålls av <a className="text-blue-600" href="https://www.elprisetjustnu.se" target="_blank" rel='noreferrer'>Elpriset just nu.se</a>
+      </div>
       <div className="text-center text-sm">
         <a className="text-blue-600" href="https://github.com/carlgrundberg/elpr.is" target="_blank" rel="noreferrer">Källkod och rapportera problem</a>
       </div>
