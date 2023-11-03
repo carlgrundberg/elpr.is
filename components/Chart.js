@@ -8,7 +8,7 @@ import {
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import annotationPlugin from 'chartjs-plugin-annotation';
-import { addDays, format } from 'date-fns';
+import { addDays, format, startOfDay, isEqual } from 'date-fns';
 import { Line } from 'react-chartjs-2';
 import { useLocalStorageState } from 'ahooks';
 
@@ -28,7 +28,7 @@ import Loading from './Loading';
 
 const formatPrice = (price) => price != null ? `${Math.round(price)} öre/kWh` : 'Unknown';
 
-const sum = (values) => values.reduce((acc, value) => acc + (value || 0), 0);
+const sum = (values) => values?.reduce((acc, value) => acc + (value || 0), 0) || 0;
 const avg = (values) => sum(values) / (values?.length || 1);
 
 const areaColors = {
@@ -63,45 +63,15 @@ function getGradient(ctx, chartArea) {
   return gradient;
 }
 
-function getPriceNow(area, now, areaPrices) {
-  let current;
-  if(areaPrices?.[area]) {
-    for (const item of areaPrices[area]) {
-      if (!current || new Date(item.date) < now) {
-        current = item;
-      }
-    }
-  }
-  return current?.sek;
-}
-
-function getAreaPrices(results) {
-  return results.reduce((acc, r) => {
-    if(r.data) {
-      if(!acc[r.data.area]) {
-        acc[r.data.area] = [];
-      }
-      acc[r.data.area].push(...r.data.prices);
-    }
-    return acc;
-  }, {});
-}
-
-function getAveragePrice(selectedAreas, areaPrices, count) {
-  const values = selectedAreas.flatMap(area => areaPrices?.[area]?.slice(-count).map((item) => item.sek));
-  return avg(values);
-}
-
-function getDates(now) {
+function getDates(date) {
   const dates = [];
   for (let i = -28; i < 2; i++) {
-    dates.push(addDays(now, i));
+    dates.push(i === 0 ? date : addDays(date, i));
   }  
   return dates;
 }
 
 const queryClient = new QueryClient();
-
 
 function Chart() {
   const [selectedAreas, setSelectedAreas] = useLocalStorageState('selectedAreas', { defaultValue: ['SE4'] });
@@ -109,19 +79,15 @@ function Chart() {
   const [showAverage, setShowAverage] = useLocalStorageState('showAverage', { defaultValue: false });
   const [showAverage30d, setShowAverage30d] = useLocalStorageState('showAverage30d', { defaultValue: true });
   const now = useTime(1000 * 60);
+  const today = startOfDay(now);
 
   const results = useQueries({ 
-    queries: selectedAreas.flatMap(area => getDates(now).map(date => ({ queryKey: [area, format(date, 'yyyy-MM-dd')], queryFn: () => getPrices(area, date), retry: false }))),    
-  });
+    queries: selectedAreas.flatMap(area => getDates(today).map(date => ({ queryKey: [area, format(date, 'yyyy-MM-dd')], queryFn: () => getPrices(area, date), retry: false }))),    
+  });    
+  
+  const isFetching = results.some(r => r.isFetching);
 
-  const areaPrices = getAreaPrices(results);
-
-  const avg = getAveragePrice(selectedAreas, areaPrices, 48);
-  const avg30d = getAveragePrice(selectedAreas, areaPrices);
-
-  const loading = results.some(r => r.isFetching);
-
-  const toggleAreas = (area) => {
+  function toggleAreas(area) {
     const newAreas = [...selectedAreas];
     const index = newAreas.indexOf(area);
     if (index === -1) {
@@ -130,22 +96,43 @@ function Chart() {
       newAreas.splice(index, 1);
     }
     setSelectedAreas(newAreas);
-  };
+  }
+
+  function getChartData(area) {
+    const data = results.filter(r => r.data?.area === area && r.data?.date >= today);
+    return data.flatMap(r => r.data?.prices.map(({ date, sek }) => ({ x: date, y: sek, value: sek })));
+  }
+
+  function getAveragePrice(date) {
+    const values = results.filter(r => selectedAreas.includes(r.data?.area) && (!date || r.data?.date >= today)).flatMap(r => r.data.prices.map((item) => item.sek));
+    return avg(values);
+  }
+  
+  function getPriceNow(area) {
+    const prices = results.find(r => r.data?.area === area && isEqual(r.data?.date, today))?.data.prices;    
+    const nextPrice = Math.max(prices?.findIndex(p => p.date > now), 1);
+    return prices?.[nextPrice - 1]?.sek;
+  }
+
+  const avgChart = getAveragePrice(today);
+  const avg30d = getAveragePrice();
 
   const chart = {
     data: {
-      datasets: selectedAreas.map(area => ({
-        data: areaPrices?.[area]?.slice(-48).map(({ date, sek }) => ({ x: date, y: sek, value: sek })),
-        borderColor: selectedAreas.length === 1 ? function(context) {
-          const chart = context.chart;
-          const {ctx, chartArea} = chart;
+      datasets: selectedAreas.map(area => {
+        return {
+          data: getChartData(area),
+          borderColor: selectedAreas.length === 1 ? function(context) {
+            const chart = context.chart;
+            const {ctx, chartArea} = chart;
 
-          if (chartArea) {
-            return getGradient(ctx, chartArea);
-          }
-        }: areaColors[area],
-        stepped: true,
-      })),
+            if (chartArea) {
+              return getGradient(ctx, chartArea);
+            }
+          }: areaColors[area],
+          stepped: true,
+        };
+      }),
     },
     options: {
       maintainAspectRatio: false,
@@ -189,7 +176,7 @@ function Chart() {
             priceNow: {
               display: showNow,
               label: {
-                content: selectedAreas.map(area => `${area}: ${formatPrice(getPriceNow(area, now, areaPrices))}`),
+                content: selectedAreas.map(area => `${area}: ${formatPrice(getPriceNow(area))}`),
                 enabled: true,
                 position: 'start'
               },
@@ -200,18 +187,18 @@ function Chart() {
               value: new Date(now)
             },
             averageToday: {
-              display: showAverage && avg,
+              display: showAverage && avgChart,
               type: 'line',
               borderDash: [6, 6],
               borderColor: 'rgb(243,244,246)',
               borderWidth: 1,
               label: {
                 enabled: true,
-                content: `Snitt: ${formatPrice(avg)}`,
+                content: `Snitt: ${formatPrice(avgChart)}`,
                 position: 'end'
               },
               scaleID: 'y',
-              value: avg,
+              value: avgChart,
             },
             average30d: {
               display: showAverage30d,
@@ -266,7 +253,7 @@ function Chart() {
       <div className="text-center text-sm">
         <a className="text-blue-600" href="https://github.com/carlgrundberg/elpr.is" target="_blank" rel="noreferrer">Källkod och rapportera problem</a>
       </div>
-      {loading && <Loading />}
+      {isFetching && <Loading />}
     </section>
   );
 }
