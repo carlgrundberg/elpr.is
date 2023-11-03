@@ -25,7 +25,6 @@ import { useTime } from '../lib/useTime';
 import { QueryClient, QueryClientProvider, useQueries } from '@tanstack/react-query';
 import { getPrices } from '../lib/api';
 import Loading from './Loading';
-import { useEffect } from 'react';
 
 const formatPrice = (price) => price != null ? `${Math.round(price)} öre/kWh` : 'Unknown';
 
@@ -101,14 +100,7 @@ function getDates(now) {
   return dates;
 }
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      cacheTime: Infinity,
-      staleTime: Infinity,
-    },
-  },
-});
+const queryClient = new QueryClient();
 
 
 function Chart() {
@@ -122,16 +114,12 @@ function Chart() {
     queries: selectedAreas.flatMap(area => getDates(now).map(date => ({ queryKey: [area, format(date, 'yyyy-MM-dd')], queryFn: () => getPrices(area, date), retry: false }))),    
   });
 
-  useEffect(() => {
-    queryClient.invalidateQueries({ queryKey: selectedAreas.map(area => [area, format(addDays(now, 1), 'yyyy-MM-dd')])});
-  }, [selectedAreas, now]);
-
   const areaPrices = getAreaPrices(results);
 
   const avg = getAveragePrice(selectedAreas, areaPrices, 48);
   const avg30d = getAveragePrice(selectedAreas, areaPrices);
 
-  const loading = results.some(r => r.isLoading);
+  const loading = results.some(r => r.isFetching);
 
   const toggleAreas = (area) => {
     const newAreas = [...selectedAreas];
