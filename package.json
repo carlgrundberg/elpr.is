@@ -9,19 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@prisma/client": "^4.4.0",
-    "@tanstack/query-async-storage-persister": "^4.24.6",
     "@tanstack/react-query": "^4.24.6",
-    "@tanstack/react-query-persist-client": "^4.24.6",
     "ahooks": "^3.7.1",
     "chart.js": "^3.7.1",
     "chartjs-adapter-date-fns": "^2.0.0",
     "chartjs-plugin-annotation": "^1.4.0",
     "date-fns": "^2.28.0",
-    "idb": "^7.1.1",
-    "idb-keyval": "^6.2.0",
     "next": "12.1.0",
-    "nordpool-utils": "github:carlgrundberg/nordpool-utils",
     "react": "17.0.2",
     "react-chartjs-2": "^4.0.1",
     "react-dom": "17.0.2"
@@ -32,7 +26,6 @@
     "eslint": "8.10.0",
     "eslint-config-next": "12.1.0",
     "postcss": "^8.4.7",
-    "prisma": "^4.4.0",
     "tailwindcss": "^3.0.23"
   }
 }

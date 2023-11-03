@@ -11,7 +11,6 @@ import annotationPlugin from 'chartjs-plugin-annotation';
 import { addDays, format } from 'date-fns';
 import { Line } from 'react-chartjs-2';
 import { useLocalStorageState } from 'ahooks';
-import persister from '../lib/persister';
 
 ChartJS.register(
   TimeScale,
@@ -23,10 +22,10 @@ ChartJS.register(
 );
 
 import { useTime } from '../lib/useTime';
-import { QueryClient, useQueries } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueries } from '@tanstack/react-query';
 import { getPrices } from '../lib/api';
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import Loading from './Loading';
+import { useEffect } from 'react';
 
 const formatPrice = (price) => price != null ? `${Math.round(price)} öre/kWh` : 'Unknown';
 
@@ -102,6 +101,16 @@ function getDates(now) {
   return dates;
 }
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      cacheTime: Infinity,
+      staleTime: Infinity,
+    },
+  },
+});
+
+
 function Chart() {
   const [selectedAreas, setSelectedAreas] = useLocalStorageState('selectedAreas', { defaultValue: ['SE4'] });
   const [showNow, setShowNow] = useLocalStorageState('showNow', { defaultValue: true });
@@ -110,8 +119,12 @@ function Chart() {
   const now = useTime(1000 * 60);
 
   const results = useQueries({ 
-    queries: selectedAreas.flatMap(area => getDates(now).map(date => ({ queryKey: [area, format(date, 'yyyy-MM-dd')], queryFn: () => getPrices(area, date) }) )) 
+    queries: selectedAreas.flatMap(area => getDates(now).map(date => ({ queryKey: [area, format(date, 'yyyy-MM-dd')], queryFn: () => getPrices(area, date), retry: false }))),    
   });
+
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: selectedAreas.map(area => [area, format(addDays(now, 1), 'yyyy-MM-dd')])});
+  }, [selectedAreas, now]);
 
   const areaPrices = getAreaPrices(results);
 
@@ -270,16 +283,6 @@ function Chart() {
   );
 }
 
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      cacheTime: Infinity,
-      staleTime: Infinity,
-    },
-  },
-});
-
 export default function ChartWrapper() {
-  return <PersistQueryClientProvider client={queryClient} persistOptions={{ persister }}><Chart /></PersistQueryClientProvider>;
+  return <QueryClientProvider client={queryClient}><Chart /></QueryClientProvider>;
 }
