@@ -8,7 +8,7 @@ import {
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
 import annotationPlugin from 'chartjs-plugin-annotation';
-import { addDays, format, startOfDay, isEqual } from 'date-fns';
+import { addDays, format, addHours } from 'date-fns';
 import { Line } from 'react-chartjs-2';
 import { useLocalStorageState } from 'ahooks';
 
@@ -65,7 +65,7 @@ function getGradient(ctx, chartArea) {
 
 function getDates(date) {
   const dates = [];
-  for (let i = -28; i < 2; i++) {
+  for (let i = -28; i <= 1; i++) {
     dates.push(i === 0 ? date : addDays(date, i));
   }  
   return dates;
@@ -78,11 +78,11 @@ function Chart() {
   const [showNow, setShowNow] = useLocalStorageState('showNow', { defaultValue: true });
   const [showAverage, setShowAverage] = useLocalStorageState('showAverage', { defaultValue: false });
   const [showAverage30d, setShowAverage30d] = useLocalStorageState('showAverage30d', { defaultValue: true });
-  const now = useTime(1000 * 60);
-  const today = startOfDay(now);
+  const now = useTime(1000 * 60);  
+  const chartStart = addHours(now, -12);
 
   const results = useQueries({ 
-    queries: selectedAreas.flatMap(area => getDates(today).map(date => ({ queryKey: [area, format(date, 'yyyy-MM-dd')], queryFn: () => getPrices(area, date), retry: false }))),    
+    queries: selectedAreas.flatMap(area => getDates(now).map(date => ({ queryKey: [area, format(date, 'yyyy-MM-dd')], queryFn: () => getPrices(area, date), retry: false }))),    
   });    
   
   const isFetching = results.some(r => r.isFetching);
@@ -98,30 +98,46 @@ function Chart() {
     setSelectedAreas(newAreas);
   }
 
-  function getChartData(area) {
-    const data = results.filter(r => r.data?.area === area && r.data?.date >= today);
-    return data.flatMap(r => r.data?.prices.map(({ date, sek }) => ({ x: date, y: sek, value: sek })));
-  }
+  const areaResults = results.reduce((acc, result) => {
+    if (result.data) {
+      if(!acc[result.data.area]) {
+        acc[result.data.area] = [];
+      }      
+      acc[result.data.area].push(...result.data.prices);
+    }
+    return acc;
+  }, {});
+
+  const chartResults = selectedAreas.reduce((acc, area) => {
+    const data = areaResults[area]?.filter(r => r.date >= chartStart);
+    acc[area] = data?.map(({ date, sek }) => ({ x: date, y: sek, value: sek }));
+    return acc;
+  }, {});
 
   function getAveragePrice(date) {
-    const values = results.filter(r => selectedAreas.includes(r.data?.area) && (!date || r.data?.date >= today)).flatMap(r => r.data.prices.map((item) => item.sek));
+    const values = selectedAreas.reduce((acc, area) => {
+      const prices = date ? areaResults[area]?.filter(r => r.date >= date) : areaResults[area];
+      if (prices) {
+        acc.push(...prices.map(p => p.sek));
+      }
+      return acc;
+    }, []);
     return avg(values);
   }
   
   function getPriceNow(area) {
-    const prices = results.find(r => r.data?.area === area && isEqual(r.data?.date, today))?.data.prices;    
-    const nextPrice = Math.max(prices?.findIndex(p => p.date > now), 1);
-    return prices?.[nextPrice - 1]?.sek;
+    const nextPrice = areaResults[area]?.findIndex(r => r.date > now);    
+    return areaResults[area]?.[nextPrice - 1]?.sek;
   }
 
-  const avgChart = getAveragePrice(today);
+  const avgChart = getAveragePrice(chartStart);
   const avg30d = getAveragePrice();
 
   const chart = {
     data: {
       datasets: selectedAreas.map(area => {
         return {
-          data: getChartData(area),
+          data: chartResults[area],
           borderColor: selectedAreas.length === 1 ? function(context) {
             const chart = context.chart;
             const {ctx, chartArea} = chart;
