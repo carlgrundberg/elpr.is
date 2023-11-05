@@ -65,10 +65,24 @@ function getGradient(ctx, chartArea) {
 
 function getDates(date) {
   const dates = [];
-  for (let i = -28; i <= 1; i++) {
+  for (let i = -28; i <= -1; i++) {
     dates.push(i === 0 ? date : addDays(date, i));
   }  
   return dates;
+}
+
+function getAreaResults(results) {
+  const areaResults = results.reduce((acc, result) => {
+    if (result.data) {
+      if(!acc[result.data.area]) {
+        acc[result.data.area] = [];
+      }      
+      acc[result.data.area].push(...result.data.prices);
+    }
+    return acc;
+  }, {});
+
+  return areaResults;
 }
 
 const queryClient = new QueryClient();
@@ -81,11 +95,23 @@ function Chart() {
   const now = useTime(1000 * 60);  
   const chartStart = addHours(now, -12);
 
-  const results = useQueries({ 
-    queries: selectedAreas.flatMap(area => getDates(now).map(date => ({ queryKey: [area, format(date, 'yyyy-MM-dd')], queryFn: () => getPrices(area, date), retry: false }))),    
+  const today = useQueries({
+    queries: selectedAreas.map(area => ({ queryKey: [area, format(now, 'yyyy-MM-dd')], queryFn: () => getPrices(area, now) })),
+  });
+
+  const tomorrow = useQueries({
+    queries: selectedAreas.map(area => ({ queryKey: [area, format(addDays(now, 1), 'yyyy-MM-dd')], queryFn: () => getPrices(area, addDays(now, 1)), retry: false })),
+  });
+
+  const pastData = useQueries({ 
+    queries: selectedAreas.flatMap(area => getDates(now).map(date => ({ queryKey: [area, format(date, 'yyyy-MM-dd')], queryFn: () => getPrices(area, date) }))),    
   });    
-  
+
+  const results = [...today, ...tomorrow, ...pastData];
+  const areaResults = getAreaResults(results);
+
   const isFetching = results.some(r => r.isFetching);
+  const hasDataTomorrow = tomorrow.every(r => r.data);
 
   function toggleAreas(area) {
     const newAreas = [...selectedAreas];
@@ -98,15 +124,7 @@ function Chart() {
     setSelectedAreas(newAreas);
   }
 
-  const areaResults = results.reduce((acc, result) => {
-    if (result.data) {
-      if(!acc[result.data.area]) {
-        acc[result.data.area] = [];
-      }      
-      acc[result.data.area].push(...result.data.prices);
-    }
-    return acc;
-  }, {});
+  
 
   const chartResults = selectedAreas.reduce((acc, area) => {
     const data = areaResults[area]?.filter(r => r.date >= chartStart);
@@ -161,7 +179,7 @@ function Chart() {
           type: 'time',
           time: {
             unit: 'hour',
-            tooltipFormat:'yyyy-MM-dd HH:mm',
+            tooltipFormat: 'yyyy-MM-dd HH:mm',
             displayFormats: {
               hour: 'HH:mm'
             }
@@ -183,7 +201,7 @@ function Chart() {
       plugins: {
         tooltip: {
           callbacks: {
-            label: (item) =>formatPrice(item.raw.value),
+            label: (item) => formatPrice(item.raw.value),
           },
           displayColors: false,
         },
@@ -192,7 +210,7 @@ function Chart() {
             priceNow: {
               display: showNow,
               label: {
-                content: selectedAreas.map(area => `${area}: ${formatPrice(getPriceNow(area))}`),
+                content: [`${format(now, 'HH:00')}-${format(addHours(now, 1), 'HH:00')}`, ...selectedAreas.map(area => `${area}: ${formatPrice(getPriceNow(area))}`)],
                 enabled: true,
                 position: 'start'
               },
@@ -263,10 +281,15 @@ function Chart() {
       <div className="w-screen p-1" style={{ height: '70vh', maxHeight: 800, maxWidth: 1200 }}>
         <Line {...chart} />
       </div>
-      <div className="text-center text-sm mb-2">
+      <div className="text-center text-sm m-2">
         Elpriser tillhandahålls av <a className="text-blue-600" href="https://www.elprisetjustnu.se" target="_blank" rel='noreferrer'>Elpriset just nu.se</a>
       </div>
-      <div className="text-center text-sm">
+      {!hasDataTomorrow && (
+        <div className="text-center text-sm m-2">
+          Morgondagens elpriser är inte tillgängliga ännu, släpps vanligtvis vid 13:30.
+        </div>
+      )}  
+      <div className="text-center text-sm m-2">
         <a className="text-blue-600" href="https://github.com/carlgrundberg/elpr.is" target="_blank" rel="noreferrer">Källkod och rapportera problem</a>
       </div>
       {isFetching && <Loading />}
