@@ -107,7 +107,7 @@ function Chart() {
     queries: selectedAreas.flatMap(area => getDates(now).map(date => ({ queryKey: [area, format(date, 'yyyy-MM-dd')], queryFn: () => getPrices(area, date) }))),    
   });    
 
-  const results = [...today, ...tomorrow, ...pastData];
+  const results = [...pastData, ...today, ...tomorrow];
   const areaResults = getAreaResults(results);
 
   const isFetching = results.some(r => r.isFetching);
@@ -291,7 +291,7 @@ function Chart() {
       )}  
       <div className="text-center text-sm m-2">
         <a className="text-blue-600" href="https://github.com/carlgrundberg/elpr.is" target="_blank" rel="noreferrer">Källkod och rapportera problem</a>
-      </div>
+      </div> 
       {isFetching && <Loading />}
     </section>
   );
