@@ -1,7 +1,7 @@
-import fs from 'fs';
-import { addHours, addDays, parseISO } from 'date-fns';
+import fs from "fs";
+import { addHours, addDays, parseISO } from "date-fns";
 import { getTodaysPrices, getTomorrowsPrices } from "nordpool-utils";
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const data = {
@@ -11,7 +11,7 @@ const data = {
 
 const areas = await prisma.area.findMany({});
 
-for(const { name: area, id: area_id } of areas) {
+for (const { name: area, id: area_id } of areas) {
   const today = await getTodaysPrices({ area });
   const tomorrow = await getTomorrowsPrices({ area });
   const prices = [...today, ...tomorrow];
@@ -35,7 +35,6 @@ for(const { name: area, id: area_id } of areas) {
     skipDuplicates: true,
   });
 
-
   const priceHistory = await prisma.price.findMany({
     where: {
       area_id,
@@ -44,12 +43,14 @@ for(const { name: area, id: area_id } of areas) {
       },
     },
     orderBy: {
-      date: 'asc',
+      date: "asc",
     },
   });
 
-  areaData.avg = priceHistory.reduce((acc, { value }) => acc + value, 0) / priceHistory.length;
+  areaData.avg =
+    priceHistory.reduce((acc, { value }) => acc + value, 0) /
+    priceHistory.length;
   data.areas[area] = areaData;
 }
 
-fs.writeFileSync('./data.json', JSON.stringify(data));
+fs.writeFileSync("./data.json", JSON.stringify(data));

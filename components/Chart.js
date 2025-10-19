@@ -5,12 +5,12 @@ import {
   PointElement,
   LineElement,
   Tooltip,
-} from 'chart.js';
-import 'chartjs-adapter-date-fns';
-import annotationPlugin from 'chartjs-plugin-annotation';
-import { addDays, format, addHours } from 'date-fns';
-import { Line } from 'react-chartjs-2';
-import { useLocalStorageState } from 'ahooks';
+} from "chart.js";
+import "chartjs-adapter-date-fns";
+import annotationPlugin from "chartjs-plugin-annotation";
+import { addDays, format, addHours, addMinutes } from "date-fns";
+import { Line } from "react-chartjs-2";
+import { useLocalStorageState } from "ahooks";
 
 ChartJS.register(
   TimeScale,
@@ -18,32 +18,33 @@ ChartJS.register(
   PointElement,
   LineElement,
   Tooltip,
-  annotationPlugin,
+  annotationPlugin
 );
 
-import { useTime } from '../lib/useTime';
-import { QueryClient, QueryClientProvider, useQueries } from '@tanstack/react-query';
-import { getPrices } from '../lib/api';
-import Loading from './Loading';
+import { useTime } from "../lib/useTime";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQueries,
+} from "@tanstack/react-query";
+import { getPrices } from "../lib/api";
+import Loading from "./Loading";
 
-const formatPrice = (price) => price != null ? `${Math.round(price)} öre/kWh` : 'Unknown';
+const formatPrice = (price) =>
+  price != null ? `${Math.round(price)} öre/kWh` : "Unknown";
 
-const sum = (values) => values?.reduce((acc, value) => acc + (value || 0), 0) || 0;
+const sum = (values) =>
+  values?.reduce((acc, value) => acc + (value || 0), 0) || 0;
 const avg = (values) => sum(values) / (values?.length || 1);
 
 const areaColors = {
-  SE1: '#4e73df',
-  SE2: '#1cc88a',
-  SE3: '#36b9cc',
-  SE4: '#f6c23e',
+  SE1: "#4e73df",
+  SE2: "#1cc88a",
+  SE3: "#36b9cc",
+  SE4: "#f6c23e",
 };
 
-const availableAreas = [
-  'SE1',
-  'SE2',
-  'SE3',
-  'SE4'
-];
+const availableAreas = ["SE1", "SE2", "SE3", "SE4"];
 
 let width, height, gradient;
 function getGradient(ctx, chartArea) {
@@ -55,9 +56,9 @@ function getGradient(ctx, chartArea) {
     width = chartWidth;
     height = chartHeight;
     gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
-    gradient.addColorStop(0, 'rgb(75, 192, 192)');
-    gradient.addColorStop(0.5, 'rgb(255, 205, 86)');
-    gradient.addColorStop(1, 'rgb(255, 99, 132)');
+    gradient.addColorStop(0, "rgb(75, 192, 192)");
+    gradient.addColorStop(0.5, "rgb(255, 205, 86)");
+    gradient.addColorStop(1, "rgb(255, 99, 132)");
   }
 
   return gradient;
@@ -67,16 +68,16 @@ function getDates(date) {
   const dates = [];
   for (let i = -28; i <= -1; i++) {
     dates.push(i === 0 ? date : addDays(date, i));
-  }  
+  }
   return dates;
 }
 
 function getAreaResults(results) {
   const areaResults = results.reduce((acc, result) => {
     if (result.data) {
-      if(!acc[result.data.area]) {
+      if (!acc[result.data.area]) {
         acc[result.data.area] = [];
-      }      
+      }
       acc[result.data.area].push(...result.data.prices);
     }
     return acc;
@@ -88,30 +89,52 @@ function getAreaResults(results) {
 const queryClient = new QueryClient();
 
 function Chart() {
-  const [selectedAreas, setSelectedAreas] = useLocalStorageState('selectedAreas', { defaultValue: ['SE4'] });
-  const [showNow, setShowNow] = useLocalStorageState('showNow', { defaultValue: true });
-  const [showAverage, setShowAverage] = useLocalStorageState('showAverage', { defaultValue: false });
-  const [showAverage30d, setShowAverage30d] = useLocalStorageState('showAverage30d', { defaultValue: true });
-  const now = useTime(1000 * 60);  
+  const [selectedAreas, setSelectedAreas] = useLocalStorageState(
+    "selectedAreas",
+    { defaultValue: ["SE4"] }
+  );
+  const [showNow, setShowNow] = useLocalStorageState("showNow", {
+    defaultValue: true,
+  });
+  const [showAverage, setShowAverage] = useLocalStorageState("showAverage", {
+    defaultValue: false,
+  });
+  const [showAverage30d, setShowAverage30d] = useLocalStorageState(
+    "showAverage30d",
+    { defaultValue: true }
+  );
+  const now = useTime(1000 * 60);
   const chartStart = addHours(now, -12);
 
   const today = useQueries({
-    queries: selectedAreas.map(area => ({ queryKey: [area, format(now, 'yyyy-MM-dd')], queryFn: () => getPrices(area, now) })),
+    queries: selectedAreas.map((area) => ({
+      queryKey: [area, format(now, "yyyy-MM-dd")],
+      queryFn: () => getPrices(area, now),
+    })),
   });
 
   const tomorrow = useQueries({
-    queries: selectedAreas.map(area => ({ queryKey: [area, format(addDays(now, 1), 'yyyy-MM-dd')], queryFn: () => getPrices(area, addDays(now, 1)), retry: false })),
+    queries: selectedAreas.map((area) => ({
+      queryKey: [area, format(addDays(now, 1), "yyyy-MM-dd")],
+      queryFn: () => getPrices(area, addDays(now, 1)),
+      retry: false,
+    })),
   });
 
-  const pastData = useQueries({ 
-    queries: selectedAreas.flatMap(area => getDates(now).map(date => ({ queryKey: [area, format(date, 'yyyy-MM-dd')], queryFn: () => getPrices(area, date) }))),    
-  });    
+  const pastData = useQueries({
+    queries: selectedAreas.flatMap((area) =>
+      getDates(now).map((date) => ({
+        queryKey: [area, format(date, "yyyy-MM-dd")],
+        queryFn: () => getPrices(area, date),
+      }))
+    ),
+  });
 
   const results = [...pastData, ...today, ...tomorrow];
   const areaResults = getAreaResults(results);
 
-  const isFetching = results.some(r => r.isFetching);
-  const hasDataTomorrow = tomorrow.every(r => r.data);
+  const isFetching = results.some((r) => r.isFetching);
+  const hasDataTomorrow = tomorrow.every((r) => r.data);
 
   function toggleAreas(area) {
     const newAreas = [...selectedAreas];
@@ -124,27 +147,27 @@ function Chart() {
     setSelectedAreas(newAreas);
   }
 
-  
-
   const chartResults = selectedAreas.reduce((acc, area) => {
-    const data = areaResults[area]?.filter(r => r.date >= chartStart);
+    const data = areaResults[area]?.filter((r) => r.date >= chartStart);
     acc[area] = data?.map(({ date, sek }) => ({ x: date, y: sek, value: sek }));
     return acc;
   }, {});
 
   function getAveragePrice(date) {
     const values = selectedAreas.reduce((acc, area) => {
-      const prices = date ? areaResults[area]?.filter(r => r.date >= date) : areaResults[area];
+      const prices = date
+        ? areaResults[area]?.filter((r) => r.date >= date)
+        : areaResults[area];
       if (prices) {
-        acc.push(...prices.map(p => p.sek));
+        acc.push(...prices.map((p) => p.sek));
       }
       return acc;
     }, []);
     return avg(values);
   }
-  
+
   function getPriceNow(area) {
-    const nextPrice = areaResults[area]?.findIndex(r => r.date > now);    
+    const nextPrice = areaResults[area]?.findIndex((r) => r.date > now);
     return areaResults[area]?.[nextPrice - 1]?.sek;
   }
 
@@ -153,17 +176,20 @@ function Chart() {
 
   const chart = {
     data: {
-      datasets: selectedAreas.map(area => {
+      datasets: selectedAreas.map((area) => {
         return {
           data: chartResults[area],
-          borderColor: selectedAreas.length === 1 ? function(context) {
-            const chart = context.chart;
-            const {ctx, chartArea} = chart;
+          borderColor:
+            selectedAreas.length === 1
+              ? function (context) {
+                  const chart = context.chart;
+                  const { ctx, chartArea } = chart;
 
-            if (chartArea) {
-              return getGradient(ctx, chartArea);
-            }
-          }: areaColors[area],
+                  if (chartArea) {
+                    return getGradient(ctx, chartArea);
+                  }
+                }
+              : areaColors[area],
           stepped: true,
         };
       }),
@@ -171,32 +197,34 @@ function Chart() {
     options: {
       maintainAspectRatio: false,
       interaction: {
-        mode: 'index',
+        mode: "index",
         intersect: false,
       },
       scales: {
         x: {
-          type: 'time',
+          type: "time",
           time: {
-            unit: 'hour',
-            tooltipFormat: 'yyyy-MM-dd HH:mm',
+            unit: "hour",
+            tooltipFormat: "yyyy-MM-dd HH:mm",
             displayFormats: {
-              hour: 'HH:mm'
-            }
+              hour: "HH:mm",
+            },
           },
           ticks: {
-            color: 'rgb(243,244,246)',
-            callback: function(val, index, data) {
-              return val === '00:00' ? format(data[index].value, 'dd MMM') : val;
+            color: "rgb(243,244,246)",
+            callback: function (val, index, data) {
+              return val === "00:00"
+                ? format(data[index].value, "dd MMM")
+                : val;
             },
           },
         },
         y: {
           ticks: {
-            color: 'rgb(243,244,246)',
+            color: "rgb(243,244,246)",
           },
           // beginAtZero: true,
-        }
+        },
       },
       plugins: {
         tooltip: {
@@ -210,47 +238,55 @@ function Chart() {
             priceNow: {
               display: showNow,
               label: {
-                content: [`${format(now, 'HH:00')}-${format(addHours(now, 1), 'HH:00')}`, ...selectedAreas.map(area => `${area}: ${formatPrice(getPriceNow(area))}`)],
+                content: [
+                  `${format(now, "HH:00")}-${format(
+                    addMinutes(now, 1),
+                    "HH:00"
+                  )}`,
+                  ...selectedAreas.map(
+                    (area) => `${area}: ${formatPrice(getPriceNow(area))}`
+                  ),
+                ],
                 enabled: true,
-                position: 'start'
+                position: "start",
               },
-              type: 'line',
-              borderColor: 'rgb(243,244,246)',
+              type: "line",
+              borderColor: "rgb(243,244,246)",
               borderWidth: 1,
-              scaleID: 'x',
-              value: new Date(now)
+              scaleID: "x",
+              value: new Date(now),
             },
             averageToday: {
               display: showAverage && avgChart,
-              type: 'line',
+              type: "line",
               borderDash: [6, 6],
-              borderColor: 'rgb(243,244,246)',
+              borderColor: "rgb(243,244,246)",
               borderWidth: 1,
               label: {
                 enabled: true,
                 content: `Snitt: ${formatPrice(avgChart)}`,
-                position: 'end'
+                position: "end",
               },
-              scaleID: 'y',
+              scaleID: "y",
               value: avgChart,
             },
             average30d: {
               display: showAverage30d,
-              type: 'line',
+              type: "line",
               borderDash: [6, 6],
-              borderColor: 'rgb(243,244,246)',
+              borderColor: "rgb(243,244,246)",
               borderWidth: 1,
               label: {
                 enabled: true,
                 content: `Snitt 30d: ${formatPrice(avg30d)}`,
-                position: 'end'
+                position: "end",
               },
-              scaleID: 'y',
+              scaleID: "y",
               value: avg30d,
             },
-          }
-        }
-      }
+          },
+        },
+      },
     },
   };
 
@@ -259,44 +295,87 @@ function Chart() {
       <div className="flex flex-wrap gap-2 place-content-center">
         {availableAreas.map((area) => (
           <label key={area} className="inline-flex items-center">
-            <input type="checkbox" className="rounded" checked={selectedAreas.includes(area)} onChange={() => toggleAreas(area)} />
+            <input
+              type="checkbox"
+              className="rounded"
+              checked={selectedAreas.includes(area)}
+              onChange={() => toggleAreas(area)}
+            />
             <span className="ml-2">{area}</span>
           </label>
         ))}
       </div>
       <div className="flex flex-wrap gap-2 place-content-center">
         <label className="inline-flex items-center">
-          <input type="checkbox" className="rounded" checked={showNow} onChange={() => setShowNow(!showNow)} />
+          <input
+            type="checkbox"
+            className="rounded"
+            checked={showNow}
+            onChange={() => setShowNow(!showNow)}
+          />
           <span className="ml-2">Just nu</span>
         </label>
         <label className="inline-flex items-center">
-          <input type="checkbox" className="rounded" checked={showAverage} onChange={() => setShowAverage(!showAverage)} />
+          <input
+            type="checkbox"
+            className="rounded"
+            checked={showAverage}
+            onChange={() => setShowAverage(!showAverage)}
+          />
           <span className="ml-2">Snitt graf</span>
         </label>
         <label className="inline-flex items-center">
-          <input type="checkbox" className="rounded" checked={showAverage30d} onChange={() => setShowAverage30d(!showAverage30d)} />
+          <input
+            type="checkbox"
+            className="rounded"
+            checked={showAverage30d}
+            onChange={() => setShowAverage30d(!showAverage30d)}
+          />
           <span className="ml-2">Snitt 30 dagar</span>
         </label>
       </div>
-      <div className="w-screen p-1" style={{ height: '70vh', maxHeight: 800, maxWidth: 1200 }}>
+      <div
+        className="w-screen p-1"
+        style={{ height: "70vh", maxHeight: 800, maxWidth: 1200 }}
+      >
         <Line {...chart} />
       </div>
       <div className="text-center text-sm m-2">
-        Elpriser tillhandahålls av <a className="text-blue-600" href="https://www.elprisetjustnu.se" target="_blank" rel='noreferrer'>Elpriset just nu.se</a>
+        Elpriser tillhandahålls av{" "}
+        <a
+          className="text-blue-600"
+          href="https://www.elprisetjustnu.se"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Elpriset just nu.se
+        </a>
       </div>
       {!hasDataTomorrow && (
         <div className="text-center text-sm m-2">
-          Morgondagens elpriser är inte tillgängliga ännu, släpps vanligtvis vid 13:30.
+          Morgondagens elpriser är inte tillgängliga ännu, släpps vanligtvis vid
+          13:30.
         </div>
-      )}  
+      )}
       <div className="text-center text-sm m-2">
-        <a className="text-blue-600" href="https://github.com/carlgrundberg/elpr.is" target="_blank" rel="noreferrer">Källkod och rapportera problem</a>
-      </div> 
+        <a
+          className="text-blue-600"
+          href="https://github.com/carlgrundberg/elpr.is"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Källkod och rapportera problem
+        </a>
+      </div>
       {isFetching && <Loading />}
     </section>
   );
 }
 
 export default function ChartWrapper() {
-  return <QueryClientProvider client={queryClient}><Chart /></QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Chart />
+    </QueryClientProvider>
+  );
 }
