@@ -21,7 +21,7 @@ ChartJS.register(
   annotationPlugin
 );
 
-import { useTime } from "../lib/useTime";
+import { useTime, getQuarterHourTime } from "../lib/useTime";
 import {
   QueryClient,
   QueryClientProvider,
@@ -239,9 +239,9 @@ function Chart() {
               display: showNow,
               label: {
                 content: [
-                  `${format(now, "HH:00")}-${format(
-                    addMinutes(now, 1),
-                    "HH:00"
+                  `${format(getQuarterHourTime(now), "HH:mm")}-${format(
+                    addMinutes(getQuarterHourTime(now), 15),
+                    "HH:mm"
                   )}`,
                   ...selectedAreas.map(
                     (area) => `${area}: ${formatPrice(getPriceNow(area))}`
