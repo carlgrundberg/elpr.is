@@ -86,7 +86,13 @@ function getAreaResults(results) {
   return areaResults;
 }
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function Chart() {
   const [selectedAreas, setSelectedAreas] = useLocalStorageState(
@@ -178,6 +184,7 @@ function Chart() {
     data: {
       datasets: selectedAreas.map((area) => {
         return {
+          label: area,
           data: chartResults[area],
           borderColor:
             selectedAreas.length === 1
@@ -212,10 +219,12 @@ function Chart() {
           },
           ticks: {
             color: "rgb(243,244,246)",
-            callback: function (val, index, data) {
-              return val === "00:00"
-                ? format(data[index].value, "dd MMM")
-                : val;
+            callback: function (value) {
+              const tickDate = new Date(value);
+              const hourLabel = format(tickDate, "HH:mm");
+              return hourLabel === "00:00"
+                ? format(tickDate, "dd MMM")
+                : hourLabel;
             },
           },
         },
@@ -229,7 +238,7 @@ function Chart() {
       plugins: {
         tooltip: {
           callbacks: {
-            label: (item) => formatPrice(item.raw.value),
+            label: (item) => `${item.dataset.label}: ${formatPrice(item.raw.value)}`,
           },
           displayColors: false,
         },
