@@ -29,6 +29,7 @@ import {
 } from "@tanstack/react-query";
 import { getPrices } from "../lib/api";
 import Loading from "./Loading";
+import posthog from "posthog-js";
 
 const formatPrice = (price) =>
   price != null ? `${Math.round(price)} öre/kWh` : "Unknown";
@@ -151,6 +152,11 @@ function Chart() {
       newAreas.splice(index, 1);
     }
     setSelectedAreas(newAreas);
+    posthog.capture("area_toggled", {
+      area,
+      enabled: index === -1,
+      selected_areas: newAreas,
+    });
   }
 
   const chartResults = selectedAreas.reduce((acc, area) => {
@@ -320,7 +326,10 @@ function Chart() {
             type="checkbox"
             className="rounded"
             checked={showNow}
-            onChange={() => setShowNow(!showNow)}
+            onChange={() => {
+              posthog.capture("show_now_toggled", { enabled: !showNow });
+              setShowNow(!showNow);
+            }}
           />
           <span className="ml-2">Just nu</span>
         </label>
@@ -329,7 +338,10 @@ function Chart() {
             type="checkbox"
             className="rounded"
             checked={showAverage}
-            onChange={() => setShowAverage(!showAverage)}
+            onChange={() => {
+              posthog.capture("show_average_toggled", { enabled: !showAverage });
+              setShowAverage(!showAverage);
+            }}
           />
           <span className="ml-2">Snitt graf</span>
         </label>
@@ -338,7 +350,10 @@ function Chart() {
             type="checkbox"
             className="rounded"
             checked={showAverage30d}
-            onChange={() => setShowAverage30d(!showAverage30d)}
+            onChange={() => {
+              posthog.capture("show_average_30d_toggled", { enabled: !showAverage30d });
+              setShowAverage30d(!showAverage30d);
+            }}
           />
           <span className="ml-2">Snitt 30 dagar</span>
         </label>
